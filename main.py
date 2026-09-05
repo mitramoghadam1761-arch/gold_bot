@@ -1,37 +1,31 @@
 import os
+import time
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import time
-import requests
-from bs4 import BeautifulSoup
 
-# --- ۱. ساخت سرور وب برای زنده نگه داشتن ربات در Render ---
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"Bot is active!")
+        self.wfile.write(b"Gold Bot is active!")
 
-def run_web_server():
-    port = int(os.environ.get("PORT", 8080))
+def bot_loop():
+    print("Gold Bot loop started...")
+    while True:
+        # کد اصلی بررسی قیمت طلا
+        time.sleep(60)
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 10000))
+    print(f"Starting HTTP Server on port {port}...")
     server = HTTPServer(('0.0.0.0', port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
-threading.Thread(target=run_web_server, daemon=True).start()
-
-# --- ۲. تنظیمات ربات تلگرام ---
-TELEGRAM_BOT_TOKEN = "8697938328:AAEsY4xIv6..."  # توکن خودتان
-TELEGRAM_CHAT_ID = "6713096570"
-THRESHOLD_BUBBLE_PERCENT = -2.0
-CHECK_INTERVAL_SECONDS = 300
-
-def send_telegram_alert(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    try:
-        response = requests.post(url, json=payload)
-        return response.ok
-    except Exception:
-        return False
-
-print("Gold Bot is running continuously...")
+if __name__ == '__main__':
+    # اجرای حلقه ربات در پس‌زمینه
+    bot_thread = threading.Thread(target=bot_loop, daemon=True)
+    bot_thread.start()
+    
+    # اجرای وب‌سرور در ترد اصلی جهت زنده و فعال نگه داشتن برنامه
+    run_http_server()
