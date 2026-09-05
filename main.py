@@ -35,98 +35,102 @@ def parse_price(price_str):
         return None
     try:
         clean_str = ''.join(c for c in price_str if c.isdigit())
-        return float(clean_str)
+        return float(clean_str) if clean_str else None
     except Exception:
         return None
 
 def fetch_market_data():
+    data = {}
     try:
         url = "https://www.tgju.org/"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         response = requests.get(url, headers=headers, timeout=15)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            data = {}
             
-            # طلای ۱۸ عیار
+            # 1. طلای 18 عیار
             el_18k = soup.find('tr', {'data-market-row': 'geram18'}) or soup.find('tr', {'id': 'l-geram18'})
-            if el_18k and el_18k.find('td', {'class': 'price'}):
-                data['18k'] = parse_price(el_18k.find('td', {'class': 'price'}).text)
+            if el_18k:
+                p_td = el_18k.find('td', {'class': 'price'})
+                if p_td:
+                    data['18k'] = parse_price(p_td.text)
                 
-            # مظنه آب‌شده
+            # 2. مظنه آب‌شده
             el_mesghal = soup.find('tr', {'data-market-row': 'mesghal'}) or soup.find('tr', {'id': 'l-mesghal'})
-            if el_mesghal and el_mesghal.find('td', {'class': 'price'}):
-                data['mesghal'] = parse_price(el_mesghal.find('td', {'class': 'price'}).text)
+            if el_mesghal:
+                p_td = el_mesghal.find('td', {'class': 'price'})
+                if p_td:
+                    data['mesghal'] = parse_price(p_td.text)
                 
-            # سکه امامی
+            # 3. سکه امامی
             el_coin = soup.find('tr', {'data-market-row': 'sekeb'}) or soup.find('tr', {'id': 'l-sekeb'})
-            if el_coin and el_coin.find('td', {'class': 'price'}):
-                data['coin'] = parse_price(el_coin.find('td', {'class': 'price'}).text)
+            if el_coin:
+                p_td = el_coin.find('td', {'class': 'price'})
+                if p_td:
+                    data['coin'] = parse_price(p_td.text)
 
-            # دلار بازار آزاد
+            # 4. دلار بازار آزاد
             el_dollar = soup.find('tr', {'data-market-row': 'price_dollar_rl'}) or soup.find('tr', {'id': 'l-price_dollar_rl'})
-            if el_dollar and el_dollar.find('td', {'class': 'price'}):
-                # تبدیل ریال به تومان
-                raw_dollar = parse_price(el_dollar.find('td', {'class': 'price'}).text)
-                if raw_dollar:
-                    data['dollar'] = raw_dollar / 10 if raw_dollar > 100000 else raw_dollar
+            if el_dollar:
+                p_td = el_dollar.find('td', {'class': 'price'})
+                if p_td:
+                    raw_dollar = parse_price(p_td.text)
+                    if raw_dollar:
+                        data['dollar'] = raw_dollar / 10 if raw_dollar > 100000 else raw_dollar
 
-            # انس جهانی طلا
+            # 5. انس جهانی طلا
             el_ons = soup.find('tr', {'data-market-row': 'ons'}) or soup.find('tr', {'id': 'l-ons'})
-            if el_ons and el_ons.find('td', {'class': 'price'}):
-                data['ons'] = parse_price(el_ons.find('td', {'class': 'price'}).text)
-                
-            return data
+            if el_ons:
+                p_td = el_ons.find('td', {'class': 'price'})
+                if p_td:
+                    data['ons'] = parse_price(p_td.text)
+                    
     except Exception as e:
         print(f"Error fetching market data: {e}")
-    return None
+        
+    return data
 
 def calculate_coin_bubble(coin_price, dollar_price, ons_price):
-    """
-    محاسبه حباب سکه بر اساس انس جهانی و دلار
-    """
     if not coin_price or not dollar_price or not ons_price:
         return None, None
     
-    # فرمول ارزش ذاتی سکه کامل (وزن ۷.۹۸۸۰۵ گرم، عیار ۹۰۰ از ۱۰۰۰) + حق ضرب
-    intrinsic_value = ((ons_price * dollar_price * 0.900 * 7.98805) / 31.1035) + 50000
-    bubble_amount = coin_price - intrinsic_value
-    bubble_percent = (bubble_amount / intrinsic_value) * 100
-    
-    return int(bubble_amount), round(bubble_percent, 2)
+    try:
+        intrinsic_value = ((ons_price * dollar_price * 0.900 * 7.98805) / 31.1035) + 50000
+        bubble_amount = coin_price - intrinsic_value
+        bubble_percent = (bubble_amount / intrinsic_value) * 100
+        return int(bubble_amount), round(bubble_percent, 2)
+    except Exception:
+        return None, None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"Gold & Dollar Analysis Bot is running!")
+        self.wfile.write(b"Gold & Dollar Analysis Bot is running stably!")
 
 def bot_loop():
     global last_prices
     print("Gold & Dollar Monitoring loop started...")
-    
-    send_telegram_message("⚡ <b>ربات هوشمند پایش طلا، سکه و دلار فعال شد.</b>\n"
-                          "محاسبه کامل حباب بر اساس دلار و انس جهانی انجام می‌شود.")
     
     first_run = True
     
     while True:
         try:
             market_data = fetch_market_data()
-            if market_data and '18k' in market_data:
-                p_18k = market_data.get('18k')
-                p_mesghal = market_data.get('mesghal')
-                p_coin = market_data.get('coin')
-                p_dollar = market_data.get('dollar')
-                p_ons = market_data.get('ons')
+            p_18k = market_data.get('18k')
+            p_mesghal = market_data.get('mesghal')
+            p_coin = market_data.get('coin')
+            p_dollar = market_data.get('dollar')
+            p_ons = market_data.get('ons')
+            
+            # بررسی دریافت حداقل یکی از شاخص‌ها
+            if p_18k or p_mesghal or p_coin or p_dollar:
                 
-                # محاسبه حباب کامل با دلار و انس
                 bubble_amt, bubble_pct = calculate_coin_bubble(p_coin, p_dollar, p_ons)
                 
-                # بررسی نوسان
                 should_alert = False
                 alert_reasons = []
                 
@@ -145,8 +149,9 @@ def bot_loop():
                             d = "📈 افزایش" if chg_d > 0 else "📉 کاهش"
                             alert_reasons.append(f"{d} {abs(chg_d):.2f}٪ در نرخ دلار")
                 
+                # ارسال گزارش در اولین اجرا یا زمان بروز نوسان
                 if first_run or should_alert:
-                    msg = "📊 <b>تحلیل لحظه‌ای بازار (طلا، سکه و دلار):</b>\n\n"
+                    msg = "📊 <b>گزارش تحلیلی بازار (طلا، سکه و دلار):</b>\n\n"
                     if alert_reasons:
                         msg += "🚨 <b>هشدار نوسان بازار:</b>\n" + "\n".join(alert_reasons) + "\n\n"
                         
@@ -159,18 +164,19 @@ def bot_loop():
                     if p_coin:
                         msg += f"🥇 <b>سکه امامی:</b> {p_coin:,.0f} تومان\n"
                     if bubble_amt is not None:
-                        msg += f"💡 <b>حباب سکه (بر اساس دلار و انس):</b> {bubble_amt:,.0f} تومان ({bubble_pct}%)\n"
+                        msg += f"💡 <b>حباب سکه:</b> {bubble_amt:,.0f} تومان ({bubble_pct}%)\n"
                     
                     send_telegram_message(msg)
                     first_run = False
                 
-                last_prices['18k'] = p_18k
-                last_prices['mesghal'] = p_mesghal
-                last_prices['coin'] = p_coin
-                last_prices['dollar'] = p_dollar
+                # ذخیره آخرین قیمت‌ها
+                if p_18k: last_prices['18k'] = p_18k
+                if p_mesghal: last_prices['mesghal'] = p_mesghal
+                if p_coin: last_prices['coin'] = p_coin
+                if p_dollar: last_prices['dollar'] = p_dollar
                 
             else:
-                print("عدم موفقیت در دریافت داده‌های کامل.")
+                print("عدم دریافت داده در این نوبت.")
         except Exception as e:
             print(f"Error in bot loop: {e}")
             
